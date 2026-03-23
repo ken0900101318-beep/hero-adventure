@@ -526,11 +526,50 @@
       font-weight: bold;
       z-index: 1000;
     }
+  
+    /* Undo Button */
+    .undo-btn {
+      position: fixed;
+      bottom: 80px;
+      right: 20px;
+      width: 60px;
+      height: 60px;
+      border-radius: 50%;
+      background: rgba(34, 197, 94, 0.9);
+      border: 2px solid #22c55e;
+      color: white;
+      font-size: 28px;
+      cursor: pointer;
+      box-shadow: 0 4px 20px rgba(34, 197, 94, 0.4);
+      transition: all 0.3s ease;
+      z-index: 1000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .undo-btn:hover {
+      transform: scale(1.1);
+      box-shadow: 0 6px 30px rgba(34, 197, 94, 0.6);
+    }
+
+    .undo-btn:active {
+      transform: scale(0.95);
+    }
+
+    .undo-btn.disabled {
+      opacity: 0.3;
+      cursor: not-allowed;
+      background: #334155;
+      border-color: #475569;
+    }
   </style>
 </head>
 <body>
   <div class="blackhole-overlay" id="blackhole-overlay"></div>
   <div class="offline-badge">🔒 完全離線版本</div>
+  <button class="undo-btn disabled" id="undoBtn" onclick="undo()" title="撤銷上一步">↶</button>
+
 
   <div class="container">
     <!-- Header -->
@@ -645,6 +684,9 @@
       userName: '小英雄'
     };
 
+    // History for undo
+    let history = [];
+
     // Missions Data
     const missions = [
       { id: 1, name: '晨間亮麗任務', desc: '刷牙/洗臉/梳頭', icon: '👤', points: 1, color: '#60a5fa' },
@@ -662,6 +704,7 @@
         state = JSON.parse(saved);
       }
       render();
+      updateUndoButton();
     }
 
     // Save state to localStorage
@@ -676,8 +719,13 @@
       const newPoints = Math.min(state.points + p, 21);
       
       if (newPoints > oldPoints) {
+        // Save to history before changing
+        history.push(JSON.parse(JSON.stringify(state)));
+        if (history.length > 10) history.shift(); // Keep last 10 only
+        
         state.points = newPoints;
         saveState();
+        updateUndoButton();
         
         // Visual feedback
         const display = document.getElementById('pointsDisplay');
@@ -738,6 +786,27 @@
         };
         saveState();
         render();
+      }
+    }
+
+
+    // Undo function
+    function undo() {
+      if (history.length === 0) return;
+      state = history.pop();
+      saveState();
+      playBeep(500, 0.15);
+      render();
+      updateUndoButton();
+    }
+
+    // Update undo button state
+    function updateUndoButton() {
+      const btn = document.getElementById('undoBtn');
+      if (history.length > 0) {
+        btn.classList.remove('disabled');
+      } else {
+        btn.classList.add('disabled');
       }
     }
 
