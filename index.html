@@ -680,6 +680,9 @@
       points: 0,
       shields: 5,
       isBlackHole: false,
+      blackHolePassword: '',  // 家長密碼（首次啟動時設定）
+      blackHoleEndTime: null, // 鎖定結束時間
+      blackHoleDuration: 24,  // 預設鎖定時長（小時）
       rewards: { 7: '', 14: '', 21: '' },
       userName: '小英雄'
     };
@@ -762,10 +765,72 @@
 
     // Toggle black hole
     function toggleBlackHole() {
-      state.isBlackHole = !state.isBlackHole;
-      playSound('blackHole');
+      if (!state.isBlackHole) {
+        // 啟動黑洞模式
+        let password = state.blackHolePassword;
+        
+        // 首次使用，設定密碼
+        if (!password) {
+          password = prompt('【家長設定】\n請設定 4 位數解鎖密碼：\n（請記住！解除黑洞時需要）');
+          if (!password || password.length < 4) {
+            alert('密碼至少需要 4 位數！');
+            return;
+          }
+          state.blackHolePassword = password;
+        }
+        
+        // 設定鎖定時長
+        const hours = prompt('鎖定時長（小時）：\n（輸入數字，例如：24）', state.blackHoleDuration);
+        if (!hours || isNaN(hours) || hours <= 0) {
+          alert('請輸入有效的小時數！');
+          return;
+        }
+        
+        state.blackHoleDuration = parseInt(hours);
+        state.blackHoleEndTime = Date.now() + (state.blackHoleDuration * 60 * 60 * 1000);
+        state.isBlackHole = true;
+        
+        playSound('blackHole');
+        saveState();
+        render();
+        
+        alert(`黑洞封印已啟動！\n將鎖定 ${state.blackHoleDuration} 小時\n需要密碼才能提前解除`);
+        
+      } else {
+        // 解除黑洞模式
+        unlockBlackHole();
+      }
+    }
+    
+    // 解除黑洞
+    function unlockBlackHole() {
+      // 檢查是否到期
+      const now = Date.now();
+      const remaining = state.blackHoleEndTime - now;
+      
+      if (remaining > 0) {
+        // 未到期，需要密碼
+        const remainingHours = Math.ceil(remaining / (60 * 60 * 1000));
+        const input = prompt(`黑洞封印中...\n剩餘時間：${remainingHours} 小時\n\n輸入家長密碼提前解除：`);
+        
+        if (input !== state.blackHolePassword) {
+          alert('❌ 密碼錯誤！無法解除封印');
+          return;
+        }
+        
+        // 密碼正確
+        if (!confirm('確定要提前解除黑洞封印嗎？')) {
+          return;
+        }
+      }
+      
+      // 解除封印
+      state.isBlackHole = false;
+      state.blackHoleEndTime = null;
+      playSound('success');
       saveState();
       render();
+      alert('✅ 黑洞封印已解除！');
     }
 
     // Update reward
@@ -874,8 +939,19 @@
       
       if (state.isBlackHole) {
         blackholeBox.classList.add('active');
-        blackholeBtn.textContent = '修復任務中';
         blackholeOverlay.classList.add('active');
+        
+        // 顯示剩餘時間
+        const now = Date.now();
+        const remaining = state.blackHoleEndTime - now;
+        
+        if (remaining > 0) {
+          const hours = Math.floor(remaining / (60 * 60 * 1000));
+          const minutes = Math.floor((remaining % (60 * 60 * 1000)) / (60 * 1000));
+          blackholeBtn.textContent = `鎖定中 ${hours}h ${minutes}m`;
+        } else {
+          blackholeBtn.textContent = '點擊解除';
+        }
       } else {
         blackholeBox.classList.remove('active');
         blackholeBtn.textContent = '啟動封印';
@@ -894,6 +970,24 @@
 
     // Initialize
     loadState();
+    
+    // 定期檢查黑洞狀態（每分鐘）
+    setInterval(() => {
+      if (state.isBlackHole && state.blackHoleEndTime) {
+        const now = Date.now();
+        if (now >= state.blackHoleEndTime) {
+          // 時間到，自動解除
+          state.isBlackHole = false;
+          state.blackHoleEndTime = null;
+          saveState();
+          render();
+          alert('⏰ 黑洞封印時間已到，自動解除！');
+        } else {
+          // 更新倒數顯示
+          render();
+        }
+      }
+    }, 60000); // 每分鐘檢查一次
   </script>
 </body>
 </html>
